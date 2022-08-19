@@ -1,17 +1,38 @@
+import { Express } from 'express'
 import { AppDataSource } from './data-source'
-import { Status } from './entity/Status'
-import * as express from 'express'
+import helmet from 'helmet'
+import * as bodyParser from 'body-parser'
+import { InversifyExpressServer, getRouteInfo } from 'inversify-express-utils'
+import container from '../containerSetup'
+class App {
+  server: InversifyExpressServer
+  constructor(private app: Express) {
+    this.server = new InversifyExpressServer(container, null, null, this.app)
+  }
 
-AppDataSource.initialize()
-  .then(async () => {
-    const repo = AppDataSource.getRepository(Status)
-    const statuses: Status[] = await repo.find()
-    console.log(statuses)
-  })
-  .catch((error) => console.log(error))
+  async InitializeDatabase() {
+    try {
+      await AppDataSource.initialize()
+      console.log('Database Connected!')
+    } catch (err) {}
+  }
 
-process.on('unhandledRejection', (reason: Error | any) => {
-  console.log(`Unhandled Rejection: ${reason.message || reason}`)
+  async InitializeMiddleware() {
+    try {
+      this.server.setConfig((app) => {
+        app.use(helmet())
+        app.use(
+          bodyParser.urlencoded({
+            extended: true,
+          }),
+        )
+        this.app.use(bodyParser.json())
+      })
+      console.log('Middlewares Initialized')
+    } catch (err) {}
+  }
 
-  throw new Error(reason.message || reason)
-})
+  async Initialize() {
+    this.server.build().listen()
+  }
+}
